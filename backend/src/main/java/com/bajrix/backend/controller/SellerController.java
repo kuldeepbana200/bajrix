@@ -1,6 +1,7 @@
 package com.bajrix.backend.controller;
 
 import com.bajrix.backend.dto.CreateSellerRequest;
+import com.bajrix.backend.dto.SellerRegistrationRequest;
 import com.bajrix.backend.dto.SellerResponse;
 import com.bajrix.backend.entity.Seller;
 import com.bajrix.backend.service.SellerService;
@@ -19,12 +20,10 @@ public class SellerController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public SellerResponse createSeller(
-            @Valid @RequestBody CreateSellerRequest request) {
-        Seller seller = sellerService.createSeller(request.name());
+    public Seller createSeller(
+            @Valid @RequestBody SellerRegistrationRequest request) {
 
-        return toResponse(seller);
+        return sellerService.createSeller(request);
     }
 
     @GetMapping("/{sellerId}")
@@ -40,6 +39,15 @@ public class SellerController {
                 seller.getId(),
                 seller.getName(),
                 seller.getStatus().name());
+    }
+
+    // Get all sellers to show it on the dashboard.
+    @GetMapping
+    public java.util.List<SellerResponse> getAllSellers() {
+        return sellerService.getAllSellers()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @PatchMapping("/{sellerId}/approve")

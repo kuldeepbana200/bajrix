@@ -1,5 +1,6 @@
 package com.bajrix.backend.service;
 
+import com.bajrix.backend.dto.ProductRequest;
 import com.bajrix.backend.entity.Product;
 import com.bajrix.backend.exception.ResourceNotFoundException;
 import com.bajrix.backend.repository.ProductRepository;
@@ -21,13 +22,12 @@ public class ProductService {
 
     public Page<Product> getProducts(
             String search,
+            String category,
             Pageable pageable) {
-        if (search == null || search.isBlank()) {
-            return productRepository.findAll(pageable);
-        }
 
-        return productRepository.findByNameContainingIgnoreCase(
-                search.trim(),
+        return productRepository.searchProducts(
+                search,
+                category,
                 pageable);
     }
 
@@ -38,16 +38,29 @@ public class ProductService {
     }
 
     @Transactional
-    public Product createProduct(
-            String name,
-            String description,
-            String category,
-            String unit) {
-        Product product = new Product(
-                name.trim(),
-                description,
-                category,
-                unit);
+    public Product createProduct(ProductRequest request) {
+
+        Product product = new Product();
+
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setCategory(request.category());
+        product.setUnit(request.unit());
+
+        return productRepository.save(product);
+    }
+
+    @Transactional
+    public Product updateProduct(Long productId, ProductRequest request) {
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with id: " + productId));
+
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setCategory(request.category());
+        product.setUnit(request.unit());
 
         return productRepository.save(product);
     }

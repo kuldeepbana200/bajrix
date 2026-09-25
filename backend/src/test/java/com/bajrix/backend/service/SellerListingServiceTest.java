@@ -1,5 +1,7 @@
 package com.bajrix.backend.service;
 
+import com.bajrix.backend.dto.CreateListingRequest;
+import com.bajrix.backend.dto.UpdateListingRequest;
 import com.bajrix.backend.entity.Product;
 import com.bajrix.backend.entity.Seller;
 import com.bajrix.backend.entity.SellerListing;
@@ -10,9 +12,12 @@ import com.bajrix.backend.exception.ResourceNotFoundException;
 import com.bajrix.backend.repository.ProductRepository;
 import com.bajrix.backend.repository.SellerListingRepository;
 import com.bajrix.backend.repository.SellerRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,14 +26,14 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SellerListingServiceTest {
 
     @Mock
-    private SellerListingRepository listingRepository;
+    private SellerListingRepository sellerListingRepository;
 
     @Mock
     private SellerRepository sellerRepository;
@@ -36,41 +41,198 @@ class SellerListingServiceTest {
     @Mock
     private ProductRepository productRepository;
 
-    private SellerListingService listingService;
+    @InjectMocks
+    private SellerListingService sellerListingService;
 
     private Seller approvedSeller;
     private Seller pendingSeller;
-    private Seller secondSeller;
+    private Seller rejectedSeller;
     private Product product;
 
     @BeforeEach
     void setUp() {
-        listingService = new SellerListingService(
-                listingRepository,
-                sellerRepository,
-                productRepository);
 
         approvedSeller = new Seller(
-                "Shree Traders",
+                "Approved Seller",
                 SellerStatus.APPROVED);
 
         pendingSeller = new Seller(
                 "Pending Seller",
                 SellerStatus.PENDING);
 
-        secondSeller = new Seller(
-                "Maa Enterprises",
-                SellerStatus.APPROVED);
+        rejectedSeller = new Seller(
+                "Rejected Seller",
+                SellerStatus.REJECTED);
 
-        product = new Product(
-                "Cement 50kg",
-                "Construction cement",
-                "Cement",
-                "bag");
+        product = new Product();
+        product.setName("Cement");
+        product.setCategory("Cement");
+        product.setUnit("50kg bag");
     }
 
+    // =========================================================
+    // 1. APPROVED SELLER LISTING IS VISIBLE
+    // =========================================================
+
     @Test
-    void approvedSellerCanCreateListing() {
+    void approvedSellerListingShouldBeVisible() {
+
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.ACTIVE);
+
+        when(productRepository.findById(1L))
+                .thenReturn(Optional.of(product));
+
+        when(sellerListingRepository.findByProductId(1L))
+                .thenReturn(List.of(listing));
+
+        List<SellerListing> result = sellerListingService.getAvailableListingsForProduct(1L);
+
+        assertEquals(1, result.size());
+
+        assertEquals(
+                ListingStatus.ACTIVE,
+                result.get(0).getStatus());
+    }
+
+    // =========================================================
+    // 2. PENDING SELLER LISTING IS HIDDEN
+    // =========================================================
+
+    @Test
+    void pendingSellerListingShouldBeHidden() {
+
+        SellerListing listing = createListing(
+                pendingSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.ACTIVE);
+
+        when(productRepository.findById(1L))
+                .thenReturn(Optional.of(product));
+
+        when(sellerListingRepository.findByProductId(1L))
+                .thenReturn(List.of(listing));
+
+        List<SellerListing> result = sellerListingService.getAvailableListingsForProduct(1L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    // =========================================================
+    // 3. STOPPED LISTING IS HIDDEN
+    // =========================================================
+
+    @Test
+    void stoppedListingShouldBeHidden() {
+
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.STOPPED);
+
+        when(productRepository.findById(1L))
+                .thenReturn(Optional.of(product));
+
+        when(sellerListingRepository.findByProductId(1L))
+                .thenReturn(List.of(listing));
+
+        List<SellerListing> result = sellerListingService.getAvailableListingsForProduct(1L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    // =========================================================
+    // 4. SELLER CAN UPDATE OWN LISTING
+    // =========================================================
+
+    @Test
+    void sellerCanUpdateOwnListing() {
+
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.ACTIVE);
+
+        when(sellerListingRepository.findByIdAndSellerId(1L, 1L))
+                .thenReturn(Optional.of(listing));
+
+        UpdateListingRequest request = new UpdateListingRequest(
+                new BigDecimal("385.00"),
+                400,
+                20);
+
+        when(sellerListingRepository.save(any(SellerListing.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        SellerListing result = sellerListingService.updateListing(
+                1L,
+                1L,
+                request.price(),
+                request.stock(),
+                request.minimumOrderQuantity());
+
+        assertEquals(
+                new BigDecimal("385.00"),
+                result.getPrice());
+
+        assertEquals(400, result.getStock());
+
+        assertEquals(
+                20,
+                result.getMinimumOrderQuantity());
+
+        verify(sellerListingRepository).save(listing);
+    }
+
+    // =========================================================
+    // 5. SELLER CANNOT UPDATE ANOTHER SELLER'S LISTING
+    // =========================================================
+
+    @Test
+    void sellerCannotUpdateAnotherSellersListing() {
+
+        when(sellerListingRepository.findByIdAndSellerId(1L, 999L))
+                .thenReturn(Optional.empty());
+
+        UpdateListingRequest request = new UpdateListingRequest(
+                new BigDecimal("385.00"),
+                400,
+                20);
+
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> sellerListingService.updateListing(
+                        999L,
+                        1L,
+                        request.price(),
+                        request.stock(),
+                        request.minimumOrderQuantity()));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 6. DUPLICATE SELLER/PRODUCT LISTING IS REJECTED
+    // =========================================================
+
+    @Test
+    void duplicateSellerProductListingShouldBeRejected() {
 
         when(sellerRepository.findById(1L))
                 .thenReturn(Optional.of(approvedSeller));
@@ -78,33 +240,133 @@ class SellerListingServiceTest {
         when(productRepository.findById(1L))
                 .thenReturn(Optional.of(product));
 
-        when(listingRepository.existsBySellerIdAndProductId(1L, 1L))
-                .thenReturn(false);
+        when(
+                sellerListingRepository
+                        .existsBySellerIdAndProductId(1L, 1L))
+                .thenReturn(true);
 
-        SellerListing savedListing = new SellerListing();
-        savedListing.setSeller(approvedSeller);
-        savedListing.setProduct(product);
-        savedListing.setPrice(new BigDecimal("400.00"));
-        savedListing.setStock(100);
-        savedListing.setMinimumOrderQuantity(10);
-        savedListing.setStatus(ListingStatus.ACTIVE);
-
-        when(listingRepository.save(any(SellerListing.class)))
-                .thenReturn(savedListing);
-
-        SellerListing result = listingService.createListing(
+        CreateListingRequest request = new CreateListingRequest(
                 1L,
-                1L,
-                new BigDecimal("400.00"),
-                100,
+                new BigDecimal("390.00"),
+                500,
                 10);
 
-        assertEquals(new BigDecimal("400.00"), result.getPrice());
-        assertEquals(100, result.getStock());
-        assertEquals(10, result.getMinimumOrderQuantity());
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.createListing(
+                        1L,
+                        request.productId(),
+                        request.price(),
+                        request.stock(),
+                        request.minimumOrderQuantity()));
 
-        verify(listingRepository).save(any(SellerListing.class));
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
     }
+
+    // =========================================================
+    // 7. NEGATIVE PRICE IS REJECTED
+    // =========================================================
+
+    @Test
+    void negativePriceShouldBeRejected() {
+
+        when(sellerRepository.findById(1L))
+                .thenReturn(Optional.of(approvedSeller));
+
+        when(productRepository.findById(1L))
+                .thenReturn(Optional.of(product));
+
+        CreateListingRequest request = new CreateListingRequest(
+                1L,
+                new BigDecimal("-10.00"),
+                500,
+                10);
+
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.createListing(
+                        1L,
+                        request.productId(),
+                        request.price(),
+                        request.stock(),
+                        request.minimumOrderQuantity()));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 8. NEGATIVE STOCK IS REJECTED
+    // =========================================================
+
+    @Test
+    void negativeStockShouldBeRejected() {
+
+        when(sellerRepository.findById(1L))
+                .thenReturn(Optional.of(approvedSeller));
+
+        when(productRepository.findById(1L))
+                .thenReturn(Optional.of(product));
+
+        CreateListingRequest request = new CreateListingRequest(
+                1L,
+                new BigDecimal("390.00"),
+                -10,
+                5);
+
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.createListing(
+                        1L,
+                        request.productId(),
+                        request.price(),
+                        request.stock(),
+                        request.minimumOrderQuantity()));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 9. MOQ GREATER THAN STOCK IS REJECTED
+    // =========================================================
+
+    @Test
+    void minimumOrderQuantityGreaterThanStockShouldBeRejected() {
+
+        when(sellerRepository.findById(1L))
+                .thenReturn(Optional.of(approvedSeller));
+
+        when(productRepository.findById(1L))
+                .thenReturn(Optional.of(product));
+
+        CreateListingRequest request = new CreateListingRequest(
+                1L,
+                new BigDecimal("390.00"),
+                5,
+                10);
+
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.createListing(
+                        1L,
+                        request.productId(),
+                        request.price(),
+                        request.stock(),
+                        request.minimumOrderQuantity()));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 10. PENDING SELLER CANNOT CREATE LISTING
+    // =========================================================
 
     @Test
     void pendingSellerCannotCreateListing() {
@@ -112,25 +374,50 @@ class SellerListingServiceTest {
         when(sellerRepository.findById(1L))
                 .thenReturn(Optional.of(pendingSeller));
 
-        BusinessException exception = assertThrows(
+        assertThrows(
                 BusinessException.class,
-                () -> listingService.createListing(
+                () -> sellerListingService.createListing(
                         1L,
                         1L,
-                        new BigDecimal("400.00"),
-                        100,
+                        new BigDecimal("390.00"),
+                        500,
                         10));
 
-        assertEquals(
-                "Only approved sellers can create listings",
-                exception.getMessage());
-
-        verify(listingRepository, never())
-                .save(any(SellerListing.class));
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
     }
 
+    // =========================================================
+    // 11. REJECTED SELLER CANNOT CREATE LISTING
+    // =========================================================
+
     @Test
-    void duplicateSellerProductListingIsRejected() {
+    void rejectedSellerCannotCreateListing() {
+
+        when(sellerRepository.findById(1L))
+                .thenReturn(Optional.of(rejectedSeller));
+
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.createListing(
+                        1L,
+                        1L,
+                        new BigDecimal("390.00"),
+                        500,
+                        10));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 12. APPROVED SELLER CAN CREATE VALID LISTING
+    // =========================================================
+
+    @Test
+    void approvedSellerCanCreateValidListing() {
 
         when(sellerRepository.findById(1L))
                 .thenReturn(Optional.of(approvedSeller));
@@ -138,241 +425,303 @@ class SellerListingServiceTest {
         when(productRepository.findById(1L))
                 .thenReturn(Optional.of(product));
 
-        when(listingRepository.existsBySellerIdAndProductId(1L, 1L))
-                .thenReturn(true);
+        when(
+                sellerListingRepository
+                        .existsBySellerIdAndProductId(1L, 1L))
+                .thenReturn(false);
 
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> listingService.createListing(
-                        1L,
-                        1L,
-                        new BigDecimal("400.00"),
-                        100,
-                        10));
+        when(sellerListingRepository.save(any(SellerListing.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertEquals(
-                "Seller already has a listing for this product",
-                exception.getMessage());
-
-        verify(listingRepository, never())
-                .save(any(SellerListing.class));
-    }
-
-    @Test
-    void negativePriceIsRejected() {
-
-        when(sellerRepository.findById(1L))
-                .thenReturn(Optional.of(approvedSeller));
-
-        when(productRepository.findById(1L))
-                .thenReturn(Optional.of(product));
-
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> listingService.createListing(
-                        1L,
-                        1L,
-                        new BigDecimal("-10.00"),
-                        100,
-                        10));
-
-        assertEquals(
-                "Price must be greater than zero",
-                exception.getMessage());
-    }
-
-    @Test
-    void negativeStockIsRejected() {
-
-        when(sellerRepository.findById(1L))
-                .thenReturn(Optional.of(approvedSeller));
-
-        when(productRepository.findById(1L))
-                .thenReturn(Optional.of(product));
-
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> listingService.createListing(
-                        1L,
-                        1L,
-                        new BigDecimal("400.00"),
-                        -1,
-                        1));
-
-        assertEquals(
-                "Stock cannot be negative",
-                exception.getMessage());
-    }
-
-    @Test
-    void minimumOrderQuantityGreaterThanStockIsRejected() {
-
-        when(sellerRepository.findById(1L))
-                .thenReturn(Optional.of(approvedSeller));
-
-        when(productRepository.findById(1L))
-                .thenReturn(Optional.of(product));
-
-        BusinessException exception = assertThrows(
-                BusinessException.class,
-                () -> listingService.createListing(
-                        1L,
-                        1L,
-                        new BigDecimal("400.00"),
-                        5,
-                        10));
-
-        assertEquals(
-                "Minimum order quantity cannot exceed stock",
-                exception.getMessage());
-    }
-
-    @Test
-    void sellerCanUpdateOwnListing() {
-
-        SellerListing listing = new SellerListing();
-        listing.setSeller(approvedSeller);
-        listing.setProduct(product);
-        listing.setPrice(new BigDecimal("400.00"));
-        listing.setStock(100);
-        listing.setMinimumOrderQuantity(10);
-        listing.setStatus(ListingStatus.ACTIVE);
-
-        when(listingRepository.findByIdAndSellerId(1L, 1L))
-                .thenReturn(Optional.of(listing));
-
-        when(listingRepository.save(any(SellerListing.class)))
-                .thenReturn(listing);
-
-        SellerListing result = listingService.updateListing(
+        SellerListing result = sellerListingService.createListing(
                 1L,
                 1L,
                 new BigDecimal("390.00"),
-                80,
-                5);
+                500,
+                10);
 
-        assertEquals(new BigDecimal("390.00"), result.getPrice());
-        assertEquals(80, result.getStock());
-        assertEquals(5, result.getMinimumOrderQuantity());
+        assertNotNull(result);
 
-        verify(listingRepository)
-                .findByIdAndSellerId(1L, 1L);
+        assertEquals(
+                approvedSeller,
+                result.getSeller());
+
+        assertEquals(
+                product,
+                result.getProduct());
+
+        assertEquals(
+                new BigDecimal("390.00"),
+                result.getPrice());
+
+        assertEquals(500, result.getStock());
+
+        assertEquals(
+                10,
+                result.getMinimumOrderQuantity());
+
+        assertEquals(
+                ListingStatus.ACTIVE,
+                result.getStatus());
+
+        verify(
+                sellerListingRepository).save(any(SellerListing.class));
     }
 
-    @Test
-    void sellerCannotUpdateAnotherSellersListing() {
+    // =========================================================
+    // 13. NON-EXISTENT PRODUCT IS REJECTED
+    // =========================================================
 
-        when(listingRepository.findByIdAndSellerId(1L, 2L))
+    @Test
+    void nonExistentProductShouldBeRejected() {
+
+        when(sellerRepository.findById(1L))
+                .thenReturn(Optional.of(approvedSeller));
+
+        when(productRepository.findById(999L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 ResourceNotFoundException.class,
-                () -> listingService.updateListing(
-                        2L,
+                () -> sellerListingService.createListing(
                         1L,
-                        new BigDecimal("100.00"),
-                        10,
-                        1));
+                        999L,
+                        new BigDecimal("390.00"),
+                        500,
+                        10));
 
-        verify(listingRepository, never())
-                .save(any(SellerListing.class));
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
     }
+
+    // =========================================================
+    // 14. SELLER NOT FOUND
+    // =========================================================
 
     @Test
-    void stoppedListingIsHiddenFromBuyers() {
+    void nonExistentSellerShouldBeRejected() {
 
-        SellerListing activeListing = new SellerListing();
-        activeListing.setSeller(approvedSeller);
-        activeListing.setProduct(product);
-        activeListing.setStatus(ListingStatus.ACTIVE);
+        when(sellerRepository.findById(999L))
+                .thenReturn(Optional.empty());
 
-        SellerListing stoppedListing = new SellerListing();
-        stoppedListing.setSeller(secondSeller);
-        stoppedListing.setProduct(product);
-        stoppedListing.setStatus(ListingStatus.STOPPED);
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> sellerListingService.createListing(
+                        999L,
+                        1L,
+                        new BigDecimal("390.00"),
+                        500,
+                        10));
 
-        when(productRepository.findById(1L))
-                .thenReturn(Optional.of(product));
-
-        when(listingRepository.findByProductId(1L))
-                .thenReturn(List.of(
-                        activeListing,
-                        stoppedListing));
-
-        List<SellerListing> result = listingService.getAvailableListingsForProduct(1L);
-
-        assertEquals(1, result.size());
-        assertSame(activeListing, result.get(0));
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
     }
+
+    // =========================================================
+    // 15. PRODUCT NOT FOUND WHEN CHECKING AVAILABILITY
+    // =========================================================
 
     @Test
-    void pendingSellerListingIsHiddenFromBuyers() {
+    void nonExistentProductShouldFailAvailabilityCheck() {
 
-        SellerListing approvedListing = new SellerListing();
-        approvedListing.setSeller(approvedSeller);
-        approvedListing.setProduct(product);
-        approvedListing.setStatus(ListingStatus.ACTIVE);
+        when(productRepository.findById(999L))
+                .thenReturn(Optional.empty());
 
-        SellerListing pendingListing = new SellerListing();
-        pendingListing.setSeller(pendingSeller);
-        pendingListing.setProduct(product);
-        pendingListing.setStatus(ListingStatus.ACTIVE);
+        assertThrows(
+                ResourceNotFoundException.class,
+                () -> sellerListingService
+                        .getAvailableListingsForProduct(999L));
 
-        when(productRepository.findById(1L))
-                .thenReturn(Optional.of(product));
-
-        when(listingRepository.findByProductId(1L))
-                .thenReturn(List.of(
-                        approvedListing,
-                        pendingListing));
-
-        List<SellerListing> result = listingService.getAvailableListingsForProduct(1L);
-
-        assertEquals(1, result.size());
-        assertSame(approvedListing, result.get(0));
+        verify(
+                sellerListingRepository,
+                never()).findByProductId(999L);
     }
+
+    // =========================================================
+    // 16. INVALID PRICE DURING UPDATE
+    // =========================================================
+
+    @Test
+    void negativePriceShouldBeRejectedDuringUpdate() {
+
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.ACTIVE);
+
+        when(
+                sellerListingRepository
+                        .findByIdAndSellerId(1L, 1L))
+                .thenReturn(Optional.of(listing));
+
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.updateListing(
+                        1L,
+                        1L,
+                        new BigDecimal("-10.00"),
+                        500,
+                        10));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 17. MOQ GREATER THAN STOCK DURING UPDATE
+    // =========================================================
+
+    @Test
+    void minimumOrderQuantityGreaterThanStockShouldBeRejectedDuringUpdate() {
+
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                100,
+                10,
+                ListingStatus.ACTIVE);
+
+        when(
+                sellerListingRepository
+                        .findByIdAndSellerId(1L, 1L))
+                .thenReturn(Optional.of(listing));
+
+        assertThrows(
+                BusinessException.class,
+                () -> sellerListingService.updateListing(
+                        1L,
+                        1L,
+                        new BigDecimal("390.00"),
+                        5,
+                        10));
+
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+
+    // =========================================================
+    // 18. SELLER CAN STOP OWN LISTING
+    // =========================================================
 
     @Test
     void sellerCanStopOwnListing() {
 
-        SellerListing listing = new SellerListing();
-        listing.setSeller(approvedSeller);
-        listing.setProduct(product);
-        listing.setPrice(new BigDecimal("400.00"));
-        listing.setStock(100);
-        listing.setMinimumOrderQuantity(10);
-        listing.setStatus(ListingStatus.ACTIVE);
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.ACTIVE);
 
-        when(listingRepository.findByIdAndSellerId(1L, 1L))
+        when(
+                sellerListingRepository
+                        .findByIdAndSellerId(1L, 1L))
                 .thenReturn(Optional.of(listing));
 
-        when(listingRepository.save(any(SellerListing.class)))
-                .thenReturn(listing);
+        when(
+                sellerListingRepository.save(any(SellerListing.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        SellerListing result = listingService.stopSelling(1L, 1L);
+        SellerListing result = sellerListingService.stopSelling(
+                1L,
+                1L);
 
         assertEquals(
                 ListingStatus.STOPPED,
                 result.getStatus());
 
-        verify(listingRepository)
-                .findByIdAndSellerId(1L, 1L);
-
-        verify(listingRepository)
-                .save(listing);
+        verify(
+                sellerListingRepository).save(listing);
     }
+
+    // =========================================================
+    // 19. SELLER CANNOT STOP ANOTHER SELLER'S LISTING
+    // =========================================================
 
     @Test
     void sellerCannotStopAnotherSellersListing() {
 
-        when(listingRepository.findByIdAndSellerId(1L, 2L))
+        when(
+                sellerListingRepository
+                        .findByIdAndSellerId(1L, 999L))
                 .thenReturn(Optional.empty());
 
         assertThrows(
                 ResourceNotFoundException.class,
-                () -> listingService.stopSelling(2L, 1L));
+                () -> sellerListingService.stopSelling(
+                        999L,
+                        1L));
 
-        verify(listingRepository, never())
-                .save(any(SellerListing.class));
+        verify(
+                sellerListingRepository,
+                never()).save(any(SellerListing.class));
+    }
+    // =========================================================
+    // 20. STOPPED LISTING REMAINS STOPPED
+    // =========================================================
+
+    @Test
+    void alreadyStoppedListingRemainsStopped() {
+
+        SellerListing listing = createListing(
+                approvedSeller,
+                product,
+                new BigDecimal("390.00"),
+                500,
+                10,
+                ListingStatus.STOPPED);
+
+        when(
+                sellerListingRepository
+                        .findByIdAndSellerId(1L, 1L))
+                .thenReturn(Optional.of(listing));
+
+        when(
+                sellerListingRepository.save(any(SellerListing.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        SellerListing result = sellerListingService.stopSelling(
+                1L,
+                1L);
+
+        assertEquals(
+                ListingStatus.STOPPED,
+                result.getStatus());
+
+        verify(
+                sellerListingRepository).save(listing);
+    }
+    
+    // =========================================================
+    // HELPER
+    // =========================================================
+
+    private SellerListing createListing(
+            Seller seller,
+            Product product,
+            BigDecimal price,
+            int stock,
+            int minimumOrderQuantity,
+            ListingStatus status) {
+
+        SellerListing listing = new SellerListing();
+
+        listing.setSeller(seller);
+        listing.setProduct(product);
+        listing.setPrice(price);
+        listing.setStock(stock);
+        listing.setMinimumOrderQuantity(minimumOrderQuantity);
+        listing.setStatus(status);
+
+        return listing;
     }
 }

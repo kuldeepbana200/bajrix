@@ -81,4 +81,11 @@ public class Product {
     public void setUnit(String unit) {
         this.unit = unit;
     }
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 }

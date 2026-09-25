@@ -1,6 +1,7 @@
 package com.bajrix.backend.controller;
 
 import com.bajrix.backend.dto.CreateProductRequest;
+import com.bajrix.backend.dto.ProductRequest;
 import com.bajrix.backend.dto.ProductResponse;
 import com.bajrix.backend.dto.SellerListingResponse;
 import com.bajrix.backend.entity.Product;
@@ -8,12 +9,14 @@ import com.bajrix.backend.entity.SellerListing;
 import com.bajrix.backend.service.ProductService;
 import com.bajrix.backend.service.SellerListingService;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,19 +38,15 @@ public class ProductController {
 
     // Get a paginated list of products with optional search
     @GetMapping
-    public Page<ProductResponse> getProducts(
+    public Page<Product> getProducts(
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(required = false) String category,
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
 
-        Pageable pageable = PageRequest.of(
-                page,
-                Math.min(size, 100),
-                Sort.by("name").ascending());
-
-        return productService
-                .getProducts(search, pageable)
-                .map(this::toProductResponse);
+        return productService.getProducts(
+                search,
+                category,
+                pageable);
     }
 
     // Get a specific product by its ID
@@ -93,15 +92,19 @@ public class ProductController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ProductResponse createProduct(
-            @Valid @RequestBody CreateProductRequest request) {
-        Product product = productService.createProduct(
-                request.name(),
-                request.description(),
-                request.category(),
-                request.unit());
+    @SecurityRequirement(name = "adminToken")
+    public Product createProduct(
+            @Valid @RequestBody ProductRequest request) {
 
-        return toProductResponse(product);
+        return productService.createProduct(request);
+    }
+
+    @PutMapping("/{id}")
+    @SecurityRequirement(name = "adminToken")
+    public Product updateProduct(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductRequest request) {
+
+        return productService.updateProduct(id, request);
     }
 }
