@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, Route } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   getSellers,
   getProducts,
@@ -8,7 +8,6 @@ import {
   updateListing,
   stopListing,
 } from "../services/api";
-import SellerRegistration from "./SellerRegisteration";
 
 function SellerDashboard() {
   const [sellers, setSellers] = useState([]);
@@ -38,7 +37,7 @@ function SellerDashboard() {
     minimumOrderQuantity: "",
   });
 
-  async function loadInitialData() {
+  const loadInitialData = useCallback(async function loadInitialData() {
     try {
       setLoading(true);
 
@@ -64,9 +63,9 @@ function SellerDashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function loadListings(id) {
+  const loadListings = useCallback(async function loadListings(id) {
     if (!id) return;
 
     try {
@@ -78,17 +77,19 @@ function SellerDashboard() {
     } catch (err) {
       setError(err.message);
     }
-  }
-
-  useEffect(() => {
-    loadInitialData();
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
     if (sellerId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadListings(sellerId);
     }
-  }, [sellerId]);
+  }, [loadListings, sellerId]);
 
   function handleFormChange(event) {
     setForm({
@@ -274,25 +275,6 @@ function SellerDashboard() {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Seller selector */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Current seller
-            </label>
-
-            <select
-              value={sellerId}
-              onChange={(event) => setSellerId(event.target.value)}
-              className="min-w-64 rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none focus:border-orange-500"
-            >
-              {sellers.map((seller) => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.name} — {seller.status}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 

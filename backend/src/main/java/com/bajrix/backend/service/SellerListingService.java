@@ -42,11 +42,7 @@ public class SellerListingService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Product not found with id: " + productId));
 
-        return listingRepository.findByProductId(productId)
-                .stream()
-                .filter(listing -> listing.getStatus() == ListingStatus.ACTIVE)
-                .filter(listing -> listing.getSeller().getStatus() == SellerStatus.APPROVED)
-                .toList();
+        return listingRepository.findAvailableByProductId(productId);
     }
 
     // SELLER

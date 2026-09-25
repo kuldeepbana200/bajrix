@@ -88,7 +88,7 @@ class SellerListingServiceTest {
         when(productRepository.findById(1L))
                 .thenReturn(Optional.of(product));
 
-        when(sellerListingRepository.findByProductId(1L))
+        when(sellerListingRepository.findAvailableByProductId(1L))
                 .thenReturn(List.of(listing));
 
         List<SellerListing> result = sellerListingService.getAvailableListingsForProduct(1L);
@@ -118,7 +118,7 @@ class SellerListingServiceTest {
         when(productRepository.findById(1L))
                 .thenReturn(Optional.of(product));
 
-        when(sellerListingRepository.findByProductId(1L))
+        when(sellerListingRepository.findAvailableByProductId(1L))
                 .thenReturn(List.of(listing));
 
         List<SellerListing> result = sellerListingService.getAvailableListingsForProduct(1L);
@@ -144,7 +144,7 @@ class SellerListingServiceTest {
         when(productRepository.findById(1L))
                 .thenReturn(Optional.of(product));
 
-        when(sellerListingRepository.findByProductId(1L))
+        when(sellerListingRepository.findAvailableByProductId(1L))
                 .thenReturn(List.of(listing));
 
         List<SellerListing> result = sellerListingService.getAvailableListingsForProduct(1L);
@@ -536,7 +536,7 @@ class SellerListingServiceTest {
 
         verify(
                 sellerListingRepository,
-                never()).findByProductId(999L);
+                never()).findAvailableByProductId(999L);
     }
 
     // =========================================================
@@ -700,7 +700,7 @@ class SellerListingServiceTest {
         verify(
                 sellerListingRepository).save(listing);
     }
-    
+
     // =========================================================
     // HELPER
     // =========================================================

@@ -1,6 +1,7 @@
 package com.bajrix.backend.exception;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,5 +44,14 @@ public class GlobalExceptionHandler {
         return Map.of(
                 "error", "VALIDATION_ERROR",
                 "message", message);
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Map<String, String> handleOptimisticLockingConflict(
+            ObjectOptimisticLockingFailureException exception) {
+        return Map.of(
+                "error", "CONFLICT",
+                "message", "The listing was changed by another request. Refresh and try again.");
     }
 }

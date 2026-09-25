@@ -72,6 +72,8 @@ The main listing rules are enforced in the backend service layer.
 10. Missing sellers, products, and listings produce appropriate API errors.
 11. Seller status affects buyer visibility.
 12. Listing updates use JPA optimistic locking through `@Version`.
+13. Stale concurrent listing updates return `409 Conflict`.
+14. PostgreSQL enforces that minimum order quantity cannot exceed stock.
 
 These rules are backed by both service-level validation and PostgreSQL constraints where appropriate.
 

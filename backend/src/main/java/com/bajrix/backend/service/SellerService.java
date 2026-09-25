@@ -6,8 +6,6 @@ import com.bajrix.backend.enums.SellerStatus;
 import com.bajrix.backend.exception.ResourceNotFoundException;
 import com.bajrix.backend.repository.SellerRepository;
 
-import java.util.List;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

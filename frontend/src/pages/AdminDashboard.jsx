@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   adminLogin,
@@ -23,7 +23,6 @@ export default function AdminDashboard() {
   const [sellers, setSellers] = useState([]);
   const [products, setProducts] = useState([]);
 
-  const [loading, setLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
 
   const [error, setError] = useState("");
@@ -34,7 +33,7 @@ export default function AdminDashboard() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  async function loadSellers(adminToken = token) {
+  const loadSellers = useCallback(async function loadSellers(adminToken) {
     if (!adminToken) return;
 
     try {
@@ -43,25 +42,26 @@ export default function AdminDashboard() {
     } catch (err) {
       setError(err.message);
     }
-  }
+  }, []);
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async function loadProducts() {
     try {
-      const data = await getAdminProducts(token);
+      const data = await getAdminProducts();
 
       // Supports both paginated and non-paginated API responses.
       setProducts(data.content || data);
     } catch (err) {
       setError(err.message);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (!token) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSellers(token);
     loadProducts();
-  }, [token]);
+  }, [loadProducts, loadSellers, token]);
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -671,8 +671,7 @@ function Detail({ label, value }) {
         {label}
       </p>
 
-      <p className="mt-1 break-words text-gray-700">{value || "—"}</p>
+      <p className="mt-1 wrap-break-word text-gray-700">{value || "—"}</p>
     </div>
   );
 }
-    

@@ -1,6 +1,5 @@
 package com.bajrix.backend.controller;
 
-import com.bajrix.backend.dto.CreateProductRequest;
 import com.bajrix.backend.dto.ProductRequest;
 import com.bajrix.backend.dto.ProductResponse;
 import com.bajrix.backend.dto.SellerListingResponse;
@@ -13,11 +12,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

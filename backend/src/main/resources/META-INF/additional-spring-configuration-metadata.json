@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "bajrix.admin.username",
+      "type": "java.lang.String",
+      "description": "Admin username used by the lightweight challenge authentication flow."
+    },
+    {
+      "name": "bajrix.admin.password",
+      "type": "java.lang.String",
+      "description": "Admin password used by the lightweight challenge authentication flow."
+    }
+  ]
+}

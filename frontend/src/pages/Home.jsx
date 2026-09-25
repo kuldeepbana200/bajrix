@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getProducts } from "../services/api";
 
@@ -15,33 +15,37 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadProducts() {
-    setLoading(true);
-    setError("");
+  const loadProducts = useCallback(
+    async function loadProducts() {
+      setLoading(true);
+      setError("");
 
-    try {
-      const data = await getProducts({
-        search,
-        category,
-        page,
-        size: 12,
-        sortBy: "name",
-        direction: sortDirection,
-      });
+      try {
+        const data = await getProducts({
+          search,
+          category,
+          page,
+          size: 12,
+          sortBy: "name",
+          direction: sortDirection,
+        });
 
-      setProducts(data.content || []);
-      setTotalPages(data.totalPages || 0);
-    } catch (err) {
-      console.error("Failed to load products:", err);
-      setError(err.message || "Failed to load products.");
-    } finally {
-      setLoading(false);
-    }
-  }
+        setProducts(data.content || []);
+        setTotalPages(data.totalPages || 0);
+      } catch (err) {
+        console.error("Failed to load products:", err);
+        setError(err.message || "Failed to load products.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [category, page, search, sortDirection],
+  );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProducts();
-  }, [search, category, page, sortDirection]);
+  }, [loadProducts]);
 
   function handleSearch(event) {
     event.preventDefault();

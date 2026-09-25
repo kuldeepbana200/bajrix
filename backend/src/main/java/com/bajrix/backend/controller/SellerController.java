@@ -1,12 +1,10 @@
 package com.bajrix.backend.controller;
 
-import com.bajrix.backend.dto.CreateSellerRequest;
 import com.bajrix.backend.dto.SellerRegistrationRequest;
 import com.bajrix.backend.dto.SellerResponse;
 import com.bajrix.backend.entity.Seller;
 import com.bajrix.backend.service.SellerService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -50,10 +48,4 @@ public class SellerController {
                 .toList();
     }
 
-    @PatchMapping("/{sellerId}/approve")
-    public SellerResponse approveSeller(
-            @PathVariable Long sellerId) {
-        return toResponse(
-                sellerService.approveSeller(sellerId));
-    }
 }

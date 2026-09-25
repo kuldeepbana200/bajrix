@@ -246,7 +246,7 @@ export async function rejectSeller(token, sellerId, reason) {
     return data;
 }
 
-export async function getAdminProducts(token) {
+export async function getAdminProducts() {
     const response = await fetch(`${API_BASE_URL}/products`);
 
     const data = await response.json();
